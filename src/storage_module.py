@@ -9,7 +9,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .config_module import AppConfig
-from .crypto_module import decrypt_file_streaming, encrypt_file_streaming, read_json, write_json
+from .crypto_module import (
+    add_manifest_hmac,
+    decrypt_file_streaming,
+    encrypt_file_streaming,
+    read_json,
+    verify_manifest_hmac,
+    write_json,
+)
 from .integrity_module import sha256_file, verify_sha256
 from .shamir_module import reconstruct_key, split_key
 
@@ -61,6 +68,7 @@ def encrypt_workspace(
         "parts": part_metas,
         "nodes": [{"id": node.id, "folder": str(node.folder)} for node in config.nodes],
     }
+    manifest = add_manifest_hmac(manifest, key)
     manifest_path = work_dir / MANIFEST_NAME
     validate_manifest(manifest)
     write_json(manifest_path, manifest)
@@ -151,7 +159,7 @@ def reconstruct_workspace(
     work_dir = Path(workspace)
     _notify(progress, "[1/4] Validating manifest...")
     manifest = _load_manifest(work_dir)
-    validate_manifest(manifest)
+    validate_manifest(manifest, require_hmac=False)
     parts = manifest["parts"]
 
     collected_dir = work_dir / "reconstruct_tmp"
@@ -177,6 +185,7 @@ def reconstruct_workspace(
         shares.append(read_json(node_share))  # type: ignore[arg-type]
 
     key = reconstruct_key(shares)
+    verify_manifest_hmac(manifest, key)
     combined_path = collected_dir / ENCRYPTED_NAME
     _notify(progress, "[3/4] Reassembling encrypted file...")
     with combined_path.open("wb") as out_file:
@@ -192,7 +201,7 @@ def reconstruct_workspace(
     LOGGER.info("Reconstructed output written to %s", Path(output_path).resolve())
 
 
-def validate_manifest(manifest: dict) -> None:
+def validate_manifest(manifest: dict, require_hmac: bool = True) -> None:
     """Validate manifest shape before distribution or reconstruction starts."""
     required_fields = {
         "version",
@@ -221,6 +230,11 @@ def validate_manifest(manifest: dict) -> None:
         raise ValueError("Manifest original_size cannot be negative")
     if int(manifest["encrypted_size"]) <= 0:
         raise ValueError("Manifest encrypted_size must be positive")
+    manifest_hmac = manifest.get("manifest_hmac")
+    if require_hmac and manifest_hmac is None:
+        raise ValueError("Manifest is missing required field(s): manifest_hmac")
+    if manifest_hmac is not None and len(str(manifest_hmac)) != 64:
+        raise ValueError("Manifest manifest_hmac must be a SHA-256 HMAC hex digest")
 
     parts = manifest["parts"]
     if not isinstance(parts, list) or len(parts) != 3:

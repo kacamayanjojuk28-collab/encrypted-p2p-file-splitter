@@ -234,6 +234,12 @@ Hash uyuşmazlığı varsa reconstruct işlemi reddedilir.
 
 Manifest ayrıca `original_filename`, `original_size`, `original_sha256`, `encrypted_size`, `created_at`, `chunk_size` ve `threshold` alanlarını içerir. Reconstruct işlemi parça okumaya başlamadan önce manifest yapısını doğrular.
 
+### Manifest Authentication
+
+Manifest bütünlüğü için AES anahtarından HKDF-SHA256 ile ayrı bir manifest authentication key türetilir. `parts_manifest.json` içeriği deterministic JSON formatına çevrilir ve `manifest_hmac` alanı hariç tutularak HMAC-SHA256 hesaplanır.
+
+Reconstruct sırasında önce 3 key share ile AES anahtarı yeniden oluşturulur, ardından aynı HKDF key derivation ile manifest authentication key türetilir ve `manifest_hmac` doğrulanır. Manifest elle değiştirilmişse, `manifest_hmac` eksikse veya eski unsigned manifest kullanılıyorsa işlem decrypt aşamasına geçmeden durdurulur.
+
 ### Streaming Dosya İşleme
 
 Dosyalar RAM'e komple alınmaz. Şifreleme, parçalama, hash hesaplama ve reconstruct işlemleri chunk-based / streaming mantığıyla yapılır. Varsayılan chunk boyutu `config.json` içindeki `chunk_size` alanıyla yönetilir.
