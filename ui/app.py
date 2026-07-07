@@ -19,6 +19,7 @@ from ui.ui_helpers import (
     load_history,
     manifest_status,
     node_health,
+    require_authentication,
     show_user_error,
 )
 
@@ -31,6 +32,8 @@ def main() -> None:
 
     try:
         st.title("Encrypted P2P File Splitter")
+        if not require_authentication():
+            return
         st.write(
             "AES-256-GCM file encryption, Shamir Secret Sharing key splitting, "
             "local node distribution, and SHA-256 integrity verification."

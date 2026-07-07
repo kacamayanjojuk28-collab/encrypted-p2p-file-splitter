@@ -1,0 +1,10 @@
+{
+  "security": {
+    "max_upload_size_mb": 100,
+    "allowed_input_dirs": ["./input", "./samples", "."],
+    "allowed_workspace_dir": "./workspace",
+    "allowed_output_dir": ".",
+    "allow_absolute_paths": false,
+    "bind_host": "127.0.0.1"
+  }
+}

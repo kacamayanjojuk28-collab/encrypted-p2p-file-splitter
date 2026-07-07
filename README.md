@@ -407,6 +407,80 @@ streamlit run ui/app.py
 5. Reconstruct sayfasından dosyayı geri üret.
 6. Network Control Center'dan event log ve transfer flow adımlarını kontrol et.
 
+## Security Hardening
+
+### UI Authentication
+
+Streamlit UI varsayılan olarak kullanıcı doğrulaması ister. Kullanıcı adı ve şifre environment variable üzerinden verilir; repo içine şifre veya secret yazılmaz.
+
+Linux/macOS:
+
+```bash
+APP_USERNAME=admin APP_PASSWORD=change-me streamlit run ui/app.py --server.address=127.0.0.1
+```
+
+Windows PowerShell:
+
+```powershell
+$env:APP_USERNAME="admin"
+$env:APP_PASSWORD="change-me"
+streamlit run ui/app.py --server.address=127.0.0.1
+```
+
+`APP_USERNAME` veya `APP_PASSWORD` yoksa UI şu uyarıyı gösterir ve işlem sayfalarını kullandırmaz:
+
+```text
+UI authentication is not configured. Set APP_USERNAME and APP_PASSWORD.
+```
+
+### Path Whitelist
+
+`security_config.json` dosyası güvenli dosya yolu kurallarını tanımlar:
+
+- `max_upload_size_mb`: varsayılan 100 MB.
+- `allowed_input_dirs`: CLI/UI input dosyalarının kabul edildiği dizinler.
+- `allowed_workspace_dir`: workspace yazma/okuma dizini.
+- `allowed_output_dir`: reconstruct output dizini.
+- `allow_absolute_paths`: varsayılan `false`.
+- `bind_host`: önerilen güvenli bind host, varsayılan `127.0.0.1`.
+
+Path kontrolleri `pathlib.resolve()` ile yapılır. `../` traversal ve symlink ile allowed base dışına çıkma denemeleri reddedilir.
+
+### File Size Limits
+
+UI upload ve CLI input dosyaları `max_upload_size_mb` limitine göre kontrol edilir. Limit aşılırsa işlem şu hata ile durur:
+
+```text
+File size exceeds the configured limit of 100 MB.
+```
+
+Reconstruct sırasında part dosya boyutları manifestte beklenen boyutlarla karşılaştırılır.
+
+### Safe Localhost Binding
+
+UI için önerilen güvenli çalıştırma:
+
+```bash
+streamlit run ui/app.py --server.address=127.0.0.1
+```
+
+Docker UI servisi `8501:8501` port mapping kullanır. Bu portu public networklere açmadan önce reverse proxy, TLS ve authentication kontrolleri eklenmelidir.
+
+Node server'lar local kullanımda `127.0.0.1`, Docker kullanımında internal Docker network içinde çalışacak şekilde tasarlanmıştır.
+
+Do not expose node ports directly to the public internet.
+
+### Node Request Hardening
+
+Node mesajları action whitelist ile kontrol edilir:
+
+- `REQUEST_PART`
+- `SEND_PART`
+- `ACK`
+- `ERROR`
+
+Bilinmeyen action reddedilir. Transfer edilen dosya adları sanitize edilir, path traversal içeren filename değerleri normalize edilir ve gelen dosya boyutu güvenlik limitini aşarsa transfer reddedilir.
+
 ## Bilinen Sınırlamalar
 
 - Bu proje localhost tabanlı bir MVP'dir.

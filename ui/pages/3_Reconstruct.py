@@ -13,21 +13,32 @@ from src.config_module import load_config
 from src.crypto_module import read_json
 from src.integrity_module import sha256_file
 from src.monitoring_module import append_network_event
+from src.security_module import (
+    load_security_config,
+    validate_output_file_path,
+    validate_workspace_path,
+)
 from src.storage_module import MANIFEST_NAME, reconstruct_workspace
-from ui.ui_helpers import app_config_path, run_with_history, show_user_error
+from ui.ui_helpers import app_config_path, require_authentication, run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Reconstruct", layout="wide")
 st.title("Reconstruct")
+if not require_authentication():
+    st.stop()
 
 config = load_config(app_config_path(PROJECT_ROOT))
-workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))
-output_text = st.text_input("Output filename", value=str(PROJECT_ROOT / "restored.bin"))
+security_config = load_security_config(PROJECT_ROOT / "security_config.json")
+workspace_text = st.text_input("Workspace", value="workspace")
+output_text = st.text_input("Output filename", value="output/restored.bin")
 
 if st.button("Reconstruct", type="primary"):
     workspace = Path(workspace_text).expanduser()
+    event_workspace = Path("workspace")
     try:
-        output_path = Path(output_text).expanduser()
+        workspace = validate_workspace_path(workspace, security_config)
+        event_workspace = workspace
+        output_path = validate_output_file_path(Path(output_text).expanduser(), security_config)
 
         def operation(tracker):
             reconstruct_workspace(
@@ -106,6 +117,6 @@ if st.button("Reconstruct", type="primary"):
                 "status": "error",
                 "message": str(exc),
             },
-            workspace,
+            event_workspace,
         )
         show_user_error("Reconstruction failed", exc)

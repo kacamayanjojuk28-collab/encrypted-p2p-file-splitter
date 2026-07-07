@@ -7,6 +7,12 @@ from pathlib import Path
 
 from src.config_module import get_node, load_config
 from src.network_module import run_node_server
+from src.security_module import (
+    load_security_config,
+    validate_input_file_path,
+    validate_output_file_path,
+    validate_workspace_path,
+)
 from src.storage_module import distribute_workspace, encrypt_workspace, reconstruct_workspace
 
 
@@ -99,22 +105,26 @@ def main() -> int:
         format="%(levelname)s: %(message)s",
     )
     config = load_config(args.config)
+    security_config = load_security_config()
 
     try:
         if args.command == "encrypt":
-            workspace = Path(args.output)
-            manifest = encrypt_workspace(Path(args.input), workspace, config, progress=print)
+            input_path = validate_input_file_path(Path(args.input), security_config)
+            workspace = validate_workspace_path(Path(args.output), security_config)
+            manifest = encrypt_workspace(input_path, workspace, config, progress=print)
             print("Done.")
             print(f"Workspace: {workspace.resolve()}")
             print(f"Manifest: {manifest.resolve()}")
         elif args.command == "distribute":
-            distribute_workspace(Path(args.workspace), config, progress=print)
+            workspace = validate_workspace_path(Path(args.workspace), security_config)
+            distribute_workspace(workspace, config, progress=print)
             print("Done.")
             for node in config.nodes:
                 print(f"Node {node.id}: {node.folder.resolve()}")
         elif args.command == "reconstruct":
-            output = Path(args.output)
-            reconstruct_workspace(Path(args.workspace), output, config, progress=print)
+            workspace = validate_workspace_path(Path(args.workspace), security_config)
+            output = validate_output_file_path(Path(args.output), security_config)
+            reconstruct_workspace(workspace, output, config, progress=print)
             print("Done.")
             print(f"Output: {output.resolve()}")
         elif args.command == "node":

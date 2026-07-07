@@ -13,6 +13,7 @@ import streamlit as st
 
 from src.config_module import AppConfig
 from src.crypto_module import read_json, write_json
+from src.security_module import is_ui_auth_configured, verify_ui_credentials
 from src.storage_module import MANIFEST_NAME
 
 
@@ -31,6 +32,35 @@ def show_user_error(title: str, exc: Exception) -> None:
     """Show a friendly UI error and keep full details in logs."""
     LOGGER.exception("%s: %s", title, exc)
     st.error(f"{title}: {exc}")
+
+
+def require_authentication() -> bool:
+    """Render login controls and return True only for authenticated sessions."""
+    if not is_ui_auth_configured():
+        st.warning(
+            "UI authentication is not configured. Set APP_USERNAME and APP_PASSWORD."
+        )
+        return False
+
+    if st.session_state.get("authenticated"):
+        with st.sidebar:
+            st.caption(f"Signed in as `{st.session_state.get('username', 'user')}`")
+            if st.button("Logout"):
+                st.session_state["authenticated"] = False
+                st.session_state.pop("username", None)
+                st.rerun()
+        return True
+
+    st.subheader("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login", type="primary"):
+        if verify_ui_credentials(username, password):
+            st.session_state["authenticated"] = True
+            st.session_state["username"] = username
+            st.rerun()
+        st.error("Invalid username or password.")
+    return False
 
 
 def history_path(workspace: Path) -> Path:

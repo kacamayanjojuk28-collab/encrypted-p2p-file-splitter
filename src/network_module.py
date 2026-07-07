@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from .config_module import NodeConfig
+from .security_module import DEFAULT_MAX_UPLOAD_SIZE_MB, sanitize_filename
 
 
 REQUEST_PART = "REQUEST_PART"
 SEND_PART = "SEND_PART"
 ERROR = "ERROR"
 ACK = "ACK"
+ALLOWED_ACTIONS = {REQUEST_PART, SEND_PART, ERROR, ACK}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -54,6 +56,7 @@ async def request_node_part(
     node: NodeConfig,
     destination_folder: Path | str,
     timeout_seconds: int | float,
+    max_transfer_size_mb: int = DEFAULT_MAX_UPLOAD_SIZE_MB,
 ) -> tuple[Path, Path]:
     """Request one node's part/share pair and store both via .tmp then rename."""
     destination = Path(destination_folder)
@@ -74,8 +77,12 @@ async def request_node_part(
             if ack.get("type") != ACK:
                 raise RuntimeError("Node did not acknowledge REQUEST_PART")
 
-            part_path = await _receive_file_message(reader, destination, timeout_seconds)
-            share_path = await _receive_file_message(reader, destination, timeout_seconds)
+            part_path = await _receive_file_message(
+                reader, destination, timeout_seconds, max_transfer_size_mb
+            )
+            share_path = await _receive_file_message(
+                reader, destination, timeout_seconds, max_transfer_size_mb
+            )
             final_ack = await _read_json_line(reader, timeout_seconds)
             if final_ack.get("type") == ERROR:
                 raise RuntimeError(str(final_ack.get("message", "Node returned an error")))
@@ -116,6 +123,8 @@ async def _read_request(reader: asyncio.StreamReader, timeout_seconds: int | flo
         raise ValueError("Invalid node request. Expected JSON or REQUEST_PART") from exc
     if not isinstance(parsed, dict):
         raise ValueError("Invalid node request. Expected a JSON object")
+    if parsed.get("type") not in ALLOWED_ACTIONS:
+        raise ValueError("Unsupported node action")
     return parsed
 
 
@@ -145,6 +154,7 @@ async def _receive_file_message(
     reader: asyncio.StreamReader,
     destination: Path,
     timeout_seconds: int | float,
+    max_transfer_size_mb: int,
 ) -> Path:
     header = await _read_json_line(reader, timeout_seconds)
     if header.get("type") == ERROR:
@@ -152,8 +162,13 @@ async def _receive_file_message(
     if header.get("type") != SEND_PART:
         raise RuntimeError("Expected SEND_PART message from node")
 
-    filename = Path(str(header["filename"])).name
+    filename = sanitize_filename(str(header["filename"]))
     remaining = int(header["size"])
+    max_size = max_transfer_size_mb * 1024 * 1024
+    if remaining < 0 or remaining > max_size:
+        raise RuntimeError(
+            f"Incoming file size exceeds configured limit of {max_transfer_size_mb} MB"
+        )
     final_path = destination / filename
     tmp_path = final_path.with_name(f"{final_path.name}.tmp")
     try:
@@ -192,4 +207,6 @@ async def _read_json_line(reader: asyncio.StreamReader, timeout_seconds: int | f
         raise ValueError("Invalid JSON response from node") from exc
     if not isinstance(parsed, dict):
         raise ValueError("Invalid node response. Expected a JSON object")
+    if parsed.get("type") not in ALLOWED_ACTIONS:
+        raise ValueError("Unsupported node action")
     return parsed
