@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config_module import load_config
 from src.crypto_module import read_json
 from src.storage_module import MANIFEST_NAME, distribute_workspace
+from ui.ui_helpers import run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Distribute", layout="wide")
@@ -21,17 +22,25 @@ config = load_config(PROJECT_ROOT / "config.json")
 workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))
 
 if st.button("Distribute", type="primary"):
+    workspace = Path(workspace_text).expanduser()
     try:
-        workspace = Path(workspace_text).expanduser()
-        messages: list[str] = []
-        distribute_workspace(workspace=workspace, config=config, progress=messages.append)
+        def operation(tracker):
+            tracker.manual_step("Verifying manifest")
+            distribute_workspace(workspace=workspace, config=config, progress=tracker.step)
+            return {
+                "input_file": str((workspace / MANIFEST_NAME).resolve()),
+                "output_file": str(workspace.resolve()),
+            }
+
+        run_with_history(
+            workspace=workspace,
+            operation_type="distribute",
+            labels=["Verifying manifest", "Preparing workspace", "Distributing parts"],
+            operation=operation,
+        )
         manifest = read_json(workspace / MANIFEST_NAME)
-        st.session_state["last_operation"] = "Distribute completed"
 
         st.success("Distribution completed successfully.")
-        for message in messages:
-            st.write(message)
-
         rows = []
         for node, part in zip(config.nodes, manifest["parts"], strict=True):
             rows.append(
@@ -43,4 +52,4 @@ if st.button("Distribute", type="primary"):
             )
         st.dataframe(rows, use_container_width=True)
     except Exception as exc:
-        st.error(f"Distribution failed: {exc}")
+        show_user_error("Distribution failed", exc)

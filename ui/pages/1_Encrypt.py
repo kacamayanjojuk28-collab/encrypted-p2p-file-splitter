@@ -13,6 +13,7 @@ from src.config_module import load_config
 from src.crypto_module import read_json
 from src.integrity_module import sha256_file
 from src.storage_module import encrypt_workspace
+from ui.ui_helpers import run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Encrypt", layout="wide")
@@ -23,26 +24,40 @@ uploaded_file = st.file_uploader("Select a file to encrypt", type=None)
 workspace_text = st.text_input("Output workspace", value=str(PROJECT_ROOT / "workspace"))
 
 if st.button("Encrypt", type="primary", disabled=uploaded_file is None):
+    workspace = Path(workspace_text).expanduser()
     try:
-        workspace = Path(workspace_text).expanduser()
-        workspace.mkdir(parents=True, exist_ok=True)
-        input_path = workspace / Path(uploaded_file.name).name
-        input_path.write_bytes(uploaded_file.getbuffer())
+        def operation(tracker):
+            tracker.manual_step("Preparing workspace")
+            workspace.mkdir(parents=True, exist_ok=True)
+            input_path = workspace / Path(uploaded_file.name).name
+            input_path.write_bytes(uploaded_file.getbuffer())
+            manifest_path = encrypt_workspace(
+                input_path=input_path,
+                workspace=workspace,
+                config=config,
+                progress=tracker.step,
+            )
+            return {
+                "input_file": str(input_path.resolve()),
+                "output_file": str(manifest_path.resolve()),
+            }
 
-        messages: list[str] = []
-        manifest_path = encrypt_workspace(
-            input_path=input_path,
+        result = run_with_history(
             workspace=workspace,
-            config=config,
-            progress=messages.append,
+            operation_type="encrypt",
+            labels=[
+                "Preparing workspace",
+                "Encrypting file",
+                "Splitting file",
+                "Writing manifest",
+                "Writing manifest",
+            ],
+            operation=operation,
         )
+        manifest_path = Path(str(result["output_file"]))
         manifest = read_json(manifest_path)
-        st.session_state["last_operation"] = "Encrypt completed"
 
         st.success("Encryption completed successfully.")
-        for message in messages:
-            st.write(message)
-
         st.metric("Generated parts", len(manifest["parts"]))
         st.write(f"Manifest: `{manifest_path.resolve()}`")
         st.write(f"Original SHA-256: `{manifest['original_sha256']}`")
@@ -71,6 +86,6 @@ if st.button("Encrypt", type="primary", disabled=uploaded_file is None):
             ],
             use_container_width=True,
         )
-        st.caption(f"Input copy hash: {sha256_file(input_path)}")
+        st.caption(f"Input copy hash: {sha256_file(Path(str(result['input_file'])))}")
     except Exception as exc:
-        st.error(f"Encryption failed: {exc}")
+        show_user_error("Encryption failed", exc)

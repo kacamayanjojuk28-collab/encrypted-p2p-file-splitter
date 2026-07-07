@@ -12,6 +12,14 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config_module import load_config
 from src.crypto_module import read_json
 from src.storage_module import MANIFEST_NAME
+from ui.ui_helpers import (
+    last_manifest_value,
+    latest_success,
+    load_history,
+    manifest_status,
+    node_health,
+    show_user_error,
+)
 
 
 def main() -> None:
@@ -20,50 +28,68 @@ def main() -> None:
         layout="wide",
     )
 
-    st.title("Encrypted P2P File Splitter")
-    st.write(
-        "AES-256-GCM ile dosya şifreleme, Shamir Secret Sharing ile anahtar "
-        "parçalama, P2P node dağıtımı ve SHA-256 bütünlük doğrulama."
-    )
+    try:
+        st.title("Encrypted P2P File Splitter")
+        st.write(
+            "AES-256-GCM file encryption, Shamir Secret Sharing key splitting, "
+            "local node distribution, and SHA-256 integrity verification."
+        )
 
-    config = load_config(PROJECT_ROOT / "config.json")
-    default_workspace = PROJECT_ROOT / "workspace"
-    manifest_path = default_workspace / MANIFEST_NAME
+        config = load_config(PROJECT_ROOT / "config.json")
+        default_workspace = PROJECT_ROOT / "workspace"
+        manifest_path = default_workspace / MANIFEST_NAME
+        history = load_history(default_workspace)
+        last_operation = history[-1] if history else {}
 
-    crypto_ready = "Ready"
-    node_ready = "Ready" if all(node.folder.exists() for node in config.nodes) else "Missing folders"
-    manifest_status = "Found" if manifest_path.exists() else "Not found"
-    last_operation = st.session_state.get("last_operation", "No operation yet")
+        st.subheader("Project Dashboard")
+        cols = st.columns(5)
+        cols[0].metric(
+            "Last encrypted file",
+            latest_success(history, "encrypt", "input_file")
+            or last_manifest_value(default_workspace, "original_filename"),
+        )
+        cols[1].metric(
+            "Last reconstructed file",
+            latest_success(history, "reconstruct", "output_file"),
+        )
+        cols[2].metric("Node health", node_health(config))
+        cols[3].metric("Manifest status", manifest_status(default_workspace))
+        cols[4].metric(
+            "Last operation result",
+            str(last_operation.get("status", "No operation yet")),
+        )
 
-    cols = st.columns(4)
-    cols[0].metric("Crypto module", crypto_ready)
-    cols[1].metric("Node folders", node_ready)
-    cols[2].metric("Manifest status", manifest_status)
-    cols[3].metric("Last operation", last_operation)
+        if history:
+            st.subheader("Recent Operations")
+            st.dataframe(list(reversed(history[-5:])), use_container_width=True)
+        else:
+            st.info("No operation history found yet. Run an Encrypt operation to create it.")
 
-    st.subheader("Current configuration")
-    st.json(
-        {
-            "chunk_size": config.chunk_size,
-            "timeout_seconds": config.timeout_seconds,
-            "threshold": config.threshold,
-            "nodes": [
-                {
-                    "id": node.id,
-                    "host": node.host,
-                    "port": node.port,
-                    "folder": str(node.folder),
-                }
-                for node in config.nodes
-            ],
-        }
-    )
+        st.subheader("Current Configuration")
+        st.json(
+            {
+                "chunk_size": config.chunk_size,
+                "timeout_seconds": config.timeout_seconds,
+                "threshold": config.threshold,
+                "nodes": [
+                    {
+                        "id": node.id,
+                        "host": node.host,
+                        "port": node.port,
+                        "folder": str(node.folder),
+                    }
+                    for node in config.nodes
+                ],
+            }
+        )
 
-    if manifest_path.exists():
-        with st.expander("Default workspace manifest"):
-            st.json(read_json(manifest_path))
+        if manifest_path.exists():
+            with st.expander("Default workspace manifest"):
+                st.json(read_json(manifest_path))
 
-    st.info("Run with: streamlit run ui/app.py")
+        st.info("Run with: streamlit run ui/app.py")
+    except Exception as exc:
+        show_user_error("Dashboard failed", exc)
 
 
 if __name__ == "__main__":
