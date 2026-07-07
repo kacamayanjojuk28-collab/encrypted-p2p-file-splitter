@@ -379,6 +379,34 @@ docker compose -f docker-compose.isolated.yml down
 
 `workspace` ve `nodes` dizinleri Docker named volume olarak bağlanır. `.dockerignore` dosyası `.git`, venv, cache, `.env`, runtime workspace dosyaları, test çıktıları ve node runtime dosyalarının image içine alınmasını engeller.
 
+## Network Control Center
+
+Streamlit UI içinde `Network Control Center` sayfası node gözlemi ve demo yönetimi için eklenmiştir. Sayfa `src/monitoring_module.py` içindeki helper fonksiyonları kullanır; ağır monitoring mantığı UI içinde tutulmaz.
+
+Özellikler:
+
+- Network Topology: `config.json` veya Docker modunda `config.docker.json` içindeki node'ları Graphviz ile gösterir.
+- Node Health Panel: Node ID, host, port, folder path, folder existence, part/share dosyaları, last modified time, TCP durumu ve genel status gösterir.
+- Connection Matrix: Node kaynak/hedef matrisinde `Self`, `OK`, `Timeout`, `Offline` gibi durumları gösterir.
+- File Distribution Map: Manifest varsa node part hash doğrulaması yapar; manifest yoksa `No manifest found` uyarısı verir.
+- Live Event Log: `workspace/network_events.jsonl` içindeki son 50 network/distribute/reconstruct event kaydını filtrelenebilir tablo olarak gösterir.
+- Transfer Flow Viewer: Son distribute/reconstruct akışını adım adım yeşil/kırmızı durumlarla gösterir.
+- Docker Awareness: `Dockerfile`, `docker-compose.yml`, `config.docker.json` varlığını ve beklenen servisleri gösterir. Docker runtime yoksa sayfa çökmez, `Docker runtime not available in this environment` mesajı gösterir.
+
+Demo akışı:
+
+1. UI'ı başlat:
+
+```bash
+streamlit run ui/app.py
+```
+
+2. Encrypt sayfasından dosya şifrele.
+3. Distribute sayfasından parçaları node klasörlerine dağıt.
+4. Network Control Center'dan parçaların hangi node'da olduğunu ve hash durumlarını kontrol et.
+5. Reconstruct sayfasından dosyayı geri üret.
+6. Network Control Center'dan event log ve transfer flow adımlarını kontrol et.
+
 ## Bilinen Sınırlamalar
 
 - Bu proje localhost tabanlı bir MVP'dir.

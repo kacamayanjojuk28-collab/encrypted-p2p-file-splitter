@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config_module import load_config
 from src.crypto_module import read_json
 from src.integrity_module import sha256_file
+from src.monitoring_module import append_network_event
 from src.storage_module import MANIFEST_NAME, reconstruct_workspace
 from ui.ui_helpers import app_config_path, run_with_history, show_user_error
 
@@ -63,6 +64,30 @@ if st.button("Reconstruct", type="primary"):
         else:
             st.error("Reconstruction completed but hash verification failed.")
 
+        flow_messages = [
+            "Manifest loaded",
+            "Node A part detected",
+            "Node B part detected",
+            "Node C part detected",
+            "Key shares reconstructed",
+            "Manifest HMAC verified",
+            "Parts joined",
+            "File decrypted",
+            "SHA-256 matched" if verified else "SHA-256 mismatch",
+        ]
+        for message in flow_messages:
+            append_network_event(
+                {
+                    "event_type": "reconstruct",
+                    "source_node": "app",
+                    "target_node": None,
+                    "action": "RECONSTRUCT",
+                    "status": "success" if verified else "error",
+                    "message": message,
+                },
+                workspace,
+            )
+
         st.write(f"Restored file: `{output_path.resolve()}`")
         st.json(
             {
@@ -72,4 +97,15 @@ if st.button("Reconstruct", type="primary"):
             }
         )
     except Exception as exc:
+        append_network_event(
+            {
+                "event_type": "error",
+                "source_node": "app",
+                "target_node": None,
+                "action": "RECONSTRUCT",
+                "status": "error",
+                "message": str(exc),
+            },
+            workspace,
+        )
         show_user_error("Reconstruction failed", exc)

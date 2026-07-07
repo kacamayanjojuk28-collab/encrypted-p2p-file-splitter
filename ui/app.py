@@ -66,6 +66,12 @@ def main() -> None:
         else:
             st.info("No operation history found yet. Run an Encrypt operation to create it.")
 
+        st.subheader("Network Observability")
+        st.page_link(
+            "pages/5_Network_Control_Center.py",
+            label="Open Network Control Center",
+        )
+
         st.subheader("Current Configuration")
         st.json(
             {

@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config_module import load_config
 from src.crypto_module import read_json
+from src.monitoring_module import append_network_event
 from src.storage_module import MANIFEST_NAME, distribute_workspace
 from ui.ui_helpers import app_config_path, run_with_history, show_user_error
 
@@ -43,6 +44,17 @@ if st.button("Distribute", type="primary"):
         st.success("Distribution completed successfully.")
         rows = []
         for node, part in zip(config.nodes, manifest["parts"], strict=True):
+            append_network_event(
+                {
+                    "event_type": "part_transfer",
+                    "source_node": "app",
+                    "target_node": node.id,
+                    "action": "DISTRIBUTE_PART",
+                    "status": "success",
+                    "message": f"Part {part['index']} distributed to Node {node.id}",
+                },
+                workspace,
+            )
             rows.append(
                 {
                     "mapping": f"Part {part['index']} -> Node {node.id}",
@@ -52,4 +64,15 @@ if st.button("Distribute", type="primary"):
             )
         st.dataframe(rows, use_container_width=True)
     except Exception as exc:
+        append_network_event(
+            {
+                "event_type": "error",
+                "source_node": "app",
+                "target_node": None,
+                "action": "DISTRIBUTE_PART",
+                "status": "error",
+                "message": str(exc),
+            },
+            workspace,
+        )
         show_user_error("Distribution failed", exc)
