@@ -12,13 +12,13 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config_module import load_config
 from src.crypto_module import read_json
 from src.storage_module import MANIFEST_NAME, distribute_workspace
-from ui.ui_helpers import run_with_history, show_user_error
+from ui.ui_helpers import app_config_path, run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Distribute", layout="wide")
 st.title("Distribute")
 
-config = load_config(PROJECT_ROOT / "config.json")
+config = load_config(app_config_path(PROJECT_ROOT))
 workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))
 
 if st.button("Distribute", type="primary"):

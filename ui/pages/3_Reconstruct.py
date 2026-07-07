@@ -13,13 +13,13 @@ from src.config_module import load_config
 from src.crypto_module import read_json
 from src.integrity_module import sha256_file
 from src.storage_module import MANIFEST_NAME, reconstruct_workspace
-from ui.ui_helpers import run_with_history, show_user_error
+from ui.ui_helpers import app_config_path, run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Reconstruct", layout="wide")
 st.title("Reconstruct")
 
-config = load_config(PROJECT_ROOT / "config.json")
+config = load_config(app_config_path(PROJECT_ROOT))
 workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))
 output_text = st.text_input("Output filename", value=str(PROJECT_ROOT / "restored.bin"))
 

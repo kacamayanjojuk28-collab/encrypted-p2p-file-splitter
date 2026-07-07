@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Workspace folder where encrypted parts, key shares, and manifest are written.",
     )
+    encrypt_parser.add_argument(
+        "--config",
+        default=argparse.SUPPRESS,
+        help="Path to config.json. Can also be passed before the command.",
+    )
 
     distribute_parser = subparsers.add_parser(
         "distribute",
@@ -45,6 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--workspace",
         required=True,
         help="Workspace folder created by the encrypt command.",
+    )
+    distribute_parser.add_argument(
+        "--config",
+        default=argparse.SUPPRESS,
+        help="Path to config.json. Can also be passed before the command.",
     )
 
     reconstruct_parser = subparsers.add_parser(
@@ -61,12 +71,22 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Path where the restored plaintext file will be written.",
     )
+    reconstruct_parser.add_argument(
+        "--config",
+        default=argparse.SUPPRESS,
+        help="Path to config.json. Can also be passed before the command.",
+    )
 
     node_parser = subparsers.add_parser(
         "node",
         help="Start a localhost TCP server for one configured node.",
     )
     node_parser.add_argument("--id", required=True, help="Node id from config.json, e.g. A.")
+    node_parser.add_argument(
+        "--config",
+        default=argparse.SUPPRESS,
+        help="Path to config.json. Can also be passed before the command.",
+    )
 
     return parser
 

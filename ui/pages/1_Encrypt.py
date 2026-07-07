@@ -13,13 +13,13 @@ from src.config_module import load_config
 from src.crypto_module import read_json
 from src.integrity_module import sha256_file
 from src.storage_module import encrypt_workspace
-from ui.ui_helpers import run_with_history, show_user_error
+from ui.ui_helpers import app_config_path, run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Encrypt", layout="wide")
 st.title("Encrypt")
 
-config = load_config(PROJECT_ROOT / "config.json")
+config = load_config(app_config_path(PROJECT_ROOT))
 uploaded_file = st.file_uploader("Select a file to encrypt", type=None)
 workspace_text = st.text_input("Output workspace", value=str(PROJECT_ROOT / "workspace"))
 

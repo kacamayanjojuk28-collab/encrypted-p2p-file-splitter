@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -17,6 +18,13 @@ from src.storage_module import MANIFEST_NAME
 
 LOGGER = logging.getLogger(__name__)
 HISTORY_FILE_NAME = "operation_history.json"
+
+
+def app_config_path(project_root: Path) -> Path:
+    configured_path = Path(os.environ.get("APP_CONFIG", "config.json"))
+    if configured_path.is_absolute():
+        return configured_path
+    return project_root / configured_path
 
 
 def show_user_error(title: str, exc: Exception) -> None:

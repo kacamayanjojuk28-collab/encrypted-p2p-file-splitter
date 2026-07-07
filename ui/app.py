@@ -13,6 +13,7 @@ from src.config_module import load_config
 from src.crypto_module import read_json
 from src.storage_module import MANIFEST_NAME
 from ui.ui_helpers import (
+    app_config_path,
     last_manifest_value,
     latest_success,
     load_history,
@@ -35,7 +36,7 @@ def main() -> None:
             "local node distribution, and SHA-256 integrity verification."
         )
 
-        config = load_config(PROJECT_ROOT / "config.json")
+        config = load_config(app_config_path(PROJECT_ROOT))
         default_workspace = PROJECT_ROOT / "workspace"
         manifest_path = default_workspace / MANIFEST_NAME
         history = load_history(default_workspace)

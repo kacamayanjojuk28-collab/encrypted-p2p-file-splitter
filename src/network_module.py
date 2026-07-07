@@ -42,9 +42,10 @@ async def run_node_server(node: NodeConfig, timeout_seconds: int | float) -> Non
             writer.close()
             await writer.wait_closed()
 
-    server = await asyncio.start_server(handle_client, node.host, node.port)
-    LOGGER.info("Node %s listening on %s:%s", node.id, node.host, node.port)
-    print(f"Node {node.id} listening on {node.host}:{node.port}")
+    bind_host = node.host if node.host in {"127.0.0.1", "localhost", "::1"} else "0.0.0.0"
+    server = await asyncio.start_server(handle_client, bind_host, node.port)
+    LOGGER.info("Node %s listening on %s:%s", node.id, bind_host, node.port)
+    print(f"Node {node.id} listening on {bind_host}:{node.port}")
     async with server:
         await server.serve_forever()
 
