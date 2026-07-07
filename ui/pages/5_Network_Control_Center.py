@@ -19,19 +19,26 @@ from src.monitoring_module import (
     load_node_config,
     read_network_events,
 )
+from src.security_module import load_security_config, validate_workspace_path
 from src.storage_module import MANIFEST_NAME
-from ui.ui_helpers import app_config_path, show_user_error
+from ui.ui_helpers import app_config_path, require_authentication, show_user_error
 
 
 st.set_page_config(page_title="Network Control Center", layout="wide")
 st.title("Network Control Center")
-
-workspace = Path(st.sidebar.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))).expanduser()
-config_path = app_config_path(PROJECT_ROOT)
-if st.sidebar.checkbox("Use Docker config", value=config_path.name == "config.docker.json"):
-    config_path = PROJECT_ROOT / "config.docker.json"
+if not require_authentication():
+    st.stop()
 
 try:
+    security_config = load_security_config(PROJECT_ROOT / "security_config.json")
+    workspace = validate_workspace_path(
+        Path(st.sidebar.text_input("Workspace", value="workspace")).expanduser(),
+        security_config,
+    )
+    config_path = app_config_path(PROJECT_ROOT)
+    if st.sidebar.checkbox("Use Docker config", value=config_path.name == "config.docker.json"):
+        config_path = PROJECT_ROOT / "config.docker.json"
+
     nodes = load_node_config(config_path)
 
     st.caption(f"Config: `{config_path}`")

@@ -12,19 +12,26 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config_module import load_config
 from src.crypto_module import read_json
 from src.monitoring_module import append_network_event
+from src.security_module import load_security_config, validate_workspace_path
 from src.storage_module import MANIFEST_NAME, distribute_workspace
-from ui.ui_helpers import app_config_path, run_with_history, show_user_error
+from ui.ui_helpers import app_config_path, require_authentication, run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Distribute", layout="wide")
 st.title("Distribute")
+if not require_authentication():
+    st.stop()
 
 config = load_config(app_config_path(PROJECT_ROOT))
-workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))
+security_config = load_security_config(PROJECT_ROOT / "security_config.json")
+workspace_text = st.text_input("Workspace", value="workspace")
 
 if st.button("Distribute", type="primary"):
     workspace = Path(workspace_text).expanduser()
+    event_workspace = Path("workspace")
     try:
+        workspace = validate_workspace_path(workspace, security_config)
+        event_workspace = workspace
         def operation(tracker):
             tracker.manual_step("Verifying manifest")
             distribute_workspace(workspace=workspace, config=config, progress=tracker.step)
@@ -73,6 +80,6 @@ if st.button("Distribute", type="primary"):
                 "status": "error",
                 "message": str(exc),
             },
-            workspace,
+            event_workspace,
         )
         show_user_error("Distribution failed", exc)

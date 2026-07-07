@@ -10,11 +10,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config_module import load_config
-from ui.ui_helpers import app_config_path, node_status, show_user_error
+from ui.ui_helpers import app_config_path, node_status, require_authentication, show_user_error
 
 
 st.set_page_config(page_title="Node Status", layout="wide")
 st.title("Node Status")
+if not require_authentication():
+    st.stop()
 
 try:
     config = load_config(app_config_path(PROJECT_ROOT))
