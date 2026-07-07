@@ -45,8 +45,57 @@ def test_encrypt_distribute_reconstruct_round_trip(tmp_path: Path) -> None:
     assert manifest["created_at"]
     assert manifest["chunk_size"] == config.chunk_size
     assert manifest["threshold"] == 3
+    assert "manifest_hmac" in manifest
     assert len(manifest["parts"]) == 3
     assert sha256_file(restored) == sha256_file(source)
+
+
+def test_valid_manifest_hmac_passes_reconstruct(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    source = tmp_path / "test.bin"
+    workspace = tmp_path / "workspace"
+    restored = tmp_path / "restored.bin"
+    source.write_bytes(deterministic_bytes(1024))
+
+    encrypt_workspace(source, workspace, config)
+    distribute_workspace(workspace, config)
+    reconstruct_workspace(workspace, restored, config)
+
+    assert sha256_file(restored) == sha256_file(source)
+
+
+def test_tampered_manifest_hmac_fails_reconstruct(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    source = tmp_path / "test.bin"
+    workspace = tmp_path / "workspace"
+    source.write_bytes(deterministic_bytes(1024))
+    encrypt_workspace(source, workspace, config)
+    distribute_workspace(workspace, config)
+
+    manifest_path = workspace / "parts_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["original_filename"] = "tampered.bin"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Manifest authentication failed"):
+        reconstruct_workspace(workspace, tmp_path / "restored.bin", config)
+
+
+def test_missing_manifest_hmac_fails_reconstruct(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    source = tmp_path / "test.bin"
+    workspace = tmp_path / "workspace"
+    source.write_bytes(deterministic_bytes(1024))
+    encrypt_workspace(source, workspace, config)
+    distribute_workspace(workspace, config)
+
+    manifest_path = workspace / "parts_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("manifest_hmac")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Manifest authentication failed"):
+        reconstruct_workspace(workspace, tmp_path / "restored.bin", config)
 
 
 def test_reconstruct_fails_when_part_is_missing(tmp_path: Path) -> None:
@@ -103,5 +152,5 @@ def test_reconstruct_rejects_wrong_key_share(tmp_path: Path) -> None:
     share["y"] = hex(int(share["y"], 16) + 1)
     share_path.write_text(json.dumps(share), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="Decryption failed"):
+    with pytest.raises(ValueError, match="Manifest authentication failed"):
         reconstruct_workspace(workspace, tmp_path / "restored.bin", config)

@@ -2,15 +2,20 @@ from __future__ import annotations
 
 import json
 import os
+from hmac import compare_digest
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
 NONCE_SIZE = 12
 TAG_SIZE = 16
 MAX_CHUNKS_PER_FILE = 2**64
+MANIFEST_HMAC_FIELD = "manifest_hmac"
+MANIFEST_HMAC_INFO = b"encrypted-p2p-file-splitter/manifest-auth/v1"
 
 
 def encrypt_file_streaming(
@@ -113,6 +118,54 @@ def decrypt_file_streaming(
         if target.exists():
             target.unlink()
         raise
+
+
+def derive_manifest_auth_key(aes_key: bytes) -> bytes:
+    """Derive a manifest authentication key separate from the AES-GCM key."""
+    if len(aes_key) != 32:
+        raise ValueError("AES-256 key must be exactly 32 bytes")
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=MANIFEST_HMAC_INFO,
+    )
+    return hkdf.derive(aes_key)
+
+
+def canonical_manifest_bytes(manifest: dict) -> bytes:
+    """Serialize manifest deterministically without the HMAC field."""
+    unsigned_manifest = {
+        key: value for key, value in manifest.items() if key != MANIFEST_HMAC_FIELD
+    }
+    return json.dumps(
+        unsigned_manifest,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+
+def compute_manifest_hmac(manifest: dict, aes_key: bytes) -> str:
+    auth_key = derive_manifest_auth_key(aes_key)
+    signer = hmac.HMAC(auth_key, hashes.SHA256())
+    signer.update(canonical_manifest_bytes(manifest))
+    return signer.finalize().hex()
+
+
+def add_manifest_hmac(manifest: dict, aes_key: bytes) -> dict:
+    signed_manifest = dict(manifest)
+    signed_manifest[MANIFEST_HMAC_FIELD] = compute_manifest_hmac(signed_manifest, aes_key)
+    return signed_manifest
+
+
+def verify_manifest_hmac(manifest: dict, aes_key: bytes) -> None:
+    expected = manifest.get(MANIFEST_HMAC_FIELD)
+    if not expected:
+        raise ValueError("Manifest authentication failed. Manifest may be corrupted or tampered.")
+    actual = compute_manifest_hmac(manifest, aes_key)
+    if not compare_digest(str(expected), actual):
+        raise ValueError("Manifest authentication failed. Manifest may be corrupted or tampered.")
 
 
 def write_json(path: Path | str, data: dict | list) -> None:
