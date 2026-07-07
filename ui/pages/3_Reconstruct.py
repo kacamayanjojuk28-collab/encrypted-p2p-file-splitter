@@ -13,6 +13,7 @@ from src.config_module import load_config
 from src.crypto_module import read_json
 from src.integrity_module import sha256_file
 from src.storage_module import MANIFEST_NAME, reconstruct_workspace
+from ui.ui_helpers import run_with_history, show_user_error
 
 
 st.set_page_config(page_title="Reconstruct", layout="wide")
@@ -23,29 +24,45 @@ workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"
 output_text = st.text_input("Output filename", value=str(PROJECT_ROOT / "restored.bin"))
 
 if st.button("Reconstruct", type="primary"):
+    workspace = Path(workspace_text).expanduser()
     try:
-        workspace = Path(workspace_text).expanduser()
         output_path = Path(output_text).expanduser()
-        messages: list[str] = []
-        reconstruct_workspace(
+
+        def operation(tracker):
+            reconstruct_workspace(
+                workspace=workspace,
+                output_path=output_path,
+                config=config,
+                progress=tracker.step,
+            )
+            tracker.manual_step("Comparing hashes")
+            return {
+                "input_file": str((workspace / MANIFEST_NAME).resolve()),
+                "output_file": str(output_path.resolve()),
+            }
+
+        run_with_history(
             workspace=workspace,
-            output_path=output_path,
-            config=config,
-            progress=messages.append,
+            operation_type="reconstruct",
+            labels=[
+                "Verifying manifest",
+                "Reconstructing file",
+                "Reconstructing file",
+                "Reconstructing file",
+                "Comparing hashes",
+            ],
+            operation=operation,
         )
         manifest = read_json(workspace / MANIFEST_NAME)
         restored_sha256 = sha256_file(output_path)
         original_sha256 = str(manifest["original_sha256"])
         verified = restored_sha256 == original_sha256
-        st.session_state["last_operation"] = "Reconstruct completed"
 
         if verified:
             st.success("Reconstruction completed and hash verification passed.")
         else:
             st.error("Reconstruction completed but hash verification failed.")
 
-        for message in messages:
-            st.write(message)
         st.write(f"Restored file: `{output_path.resolve()}`")
         st.json(
             {
@@ -55,4 +72,4 @@ if st.button("Reconstruct", type="primary"):
             }
         )
     except Exception as exc:
-        st.error(f"Reconstruction failed: {exc}")
+        show_user_error("Reconstruction failed", exc)

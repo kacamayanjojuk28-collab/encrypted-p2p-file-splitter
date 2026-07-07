@@ -162,11 +162,21 @@ streamlit run ui/app.py
 
 Arayüz sayfaları:
 
-- Ana sayfa: sistem durumu, node klasörleri, manifest durumu ve mevcut config özeti.
-- Encrypt: dosya yükleme, workspace seçimi, şifreleme ve manifest/part bilgileri.
-- Distribute: workspace seçimi, part ve key share dosyalarını node klasörlerine dağıtma.
-- Reconstruct: node klasörlerinden restore işlemi ve SHA-256 hash karşılaştırması.
-- Node Status: config içindeki node bilgileri ve node klasörlerindeki part/share durumu.
+- Ana sayfa: demo dashboard, son işlem sonucu, son 5 operation history kaydı, node health ve manifest durumu.
+- Encrypt: dosya yükleme, workspace seçimi, progress bar, step-by-step status ve manifest/part bilgileri.
+- Distribute: workspace seçimi, manifest doğrulama progress'i, part ve key share dosyalarını node klasörlerine dağıtma.
+- Reconstruct: restore progress'i, hash karşılaştırması ve restored dosya konumu.
+- Node Status: config içindeki node bilgileri, status badge, node klasör dosya listesi ve eksik part/share uyarıları.
+
+UI işlem akışı:
+
+1. Encrypt sayfasında dosya yüklenir ve workspace seçilir.
+2. Arayüz `Preparing workspace`, `Encrypting file`, `Splitting file`, `Writing manifest` adımlarını progress olarak gösterir.
+3. Distribute sayfasında workspace seçilir; manifest doğrulanır ve parçalar node klasörlerine dağıtılır.
+4. Reconstruct sayfasında workspace ve output dosyası seçilir; dosya geri oluşturulur ve hash karşılaştırması gösterilir.
+5. Ana sayfa `workspace/operation_history.json` içindeki son 5 işlemi listeler.
+
+Her UI işlemi sonrasında `workspace/operation_history.json` dosyasına şu alanlarla kayıt eklenir: `operation_type`, `status`, `timestamp`, `input_file`, `output_file`, `duration_seconds`, `error_message`.
 
 ## Örnek Demo Akışı
 

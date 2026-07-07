@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config_module import load_config
+from ui.ui_helpers import node_status, show_user_error
 
 
 st.set_page_config(page_title="Node Status", layout="wide")
@@ -18,32 +19,35 @@ st.title("Node Status")
 try:
     config = load_config(PROJECT_ROOT / "config.json")
     rows = []
-    missing_messages = []
 
     for node in config.nodes:
-        part_files = sorted(node.folder.glob("part_*.bin"))
-        share_files = sorted(node.folder.glob("key_share_*.json"))
-        has_part = bool(part_files)
-        has_share = bool(share_files)
+        status_info = node_status(node)
+        files = status_info["files"]
         rows.append(
             {
                 "node_id": node.id,
+                "status": status_info["status"],
                 "host": node.host,
                 "port": node.port,
                 "folder": str(node.folder),
-                "part_present": has_part,
-                "share_present": has_share,
+                "part_files": ", ".join(status_info["part_files"]) or "-",
+                "share_files": ", ".join(status_info["share_files"]) or "-",
+                "all_files": ", ".join(files) or "-",
             }
         )
-        if not has_part or not has_share:
-            missing_messages.append(f"Node {node.id} is missing part or key share files.")
 
     st.dataframe(rows, use_container_width=True)
 
-    if missing_messages:
-        for message in missing_messages:
-            st.warning(message)
-    else:
-        st.success("All node folders contain part and key share files.")
+    for row in rows:
+        status = row["status"]
+        label = f"Node {row['node_id']}: {status}"
+        if status == "Ready":
+            st.success(label)
+        elif status == "Empty":
+            st.info(label)
+        elif status == "Missing files":
+            st.warning(label)
+        else:
+            st.error(label)
 except Exception as exc:
-    st.error(f"Node status check failed: {exc}")
+    show_user_error("Node status check failed", exc)
