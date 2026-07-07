@@ -150,6 +150,24 @@ Farklı bir config dosyası kullanmak için:
 python main.py --config custom-config.json encrypt --input test.bin --output workspace
 ```
 
+## Streamlit UI
+
+CLI sistemi korunur; Streamlit arayüzü ayrı bir katman olarak `ui/` altında bulunur ve backend işlemleri için `src/` modüllerini çağırır.
+
+UI'ı başlatmak için:
+
+```bash
+streamlit run ui/app.py
+```
+
+Arayüz sayfaları:
+
+- Ana sayfa: sistem durumu, node klasörleri, manifest durumu ve mevcut config özeti.
+- Encrypt: dosya yükleme, workspace seçimi, şifreleme ve manifest/part bilgileri.
+- Distribute: workspace seçimi, part ve key share dosyalarını node klasörlerine dağıtma.
+- Reconstruct: node klasörlerinden restore işlemi ve SHA-256 hash karşılaştırması.
+- Node Status: config içindeki node bilgileri ve node klasörlerindeki part/share durumu.
+
 ## Örnek Demo Akışı
 
 Küçük bir demo dosyası oluştur:
