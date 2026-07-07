@@ -1,0 +1,70 @@
+services:
+  app:
+    build: .
+    image: encrypted-p2p-file-splitter:local
+    working_dir: /app
+    volumes:
+      - workspace-data:/app/workspace
+      - nodes-data:/app/nodes
+    networks:
+      - p2p-shared
+
+  node-a:
+    image: encrypted-p2p-file-splitter:local
+    build: .
+    command: ["python", "main.py", "node", "--id", "A", "--config", "config.docker.json"]
+    working_dir: /app
+    volumes:
+      - nodes-data:/app/nodes
+    networks:
+      - p2p-shared
+
+  node-b:
+    image: encrypted-p2p-file-splitter:local
+    build: .
+    command: ["python", "main.py", "node", "--id", "B", "--config", "config.docker.json"]
+    working_dir: /app
+    volumes:
+      - nodes-data:/app/nodes
+    networks:
+      - p2p-shared
+
+  node-c:
+    image: encrypted-p2p-file-splitter:local
+    build: .
+    command: ["python", "main.py", "node", "--id", "C", "--config", "config.docker.json"]
+    working_dir: /app
+    volumes:
+      - nodes-data:/app/nodes
+    networks:
+      - p2p-shared
+
+  ui:
+    image: encrypted-p2p-file-splitter:local
+    build: .
+    command:
+      [
+        "streamlit",
+        "run",
+        "ui/app.py",
+        "--server.address=0.0.0.0",
+        "--server.port=8501"
+      ]
+    environment:
+      APP_CONFIG: config.docker.json
+    working_dir: /app
+    ports:
+      - "8501:8501"
+    volumes:
+      - workspace-data:/app/workspace
+      - nodes-data:/app/nodes
+    networks:
+      - p2p-shared
+
+networks:
+  p2p-shared:
+    driver: bridge
+
+volumes:
+  workspace-data:
+  nodes-data:

@@ -262,6 +262,123 @@ Test kapsamı:
 - Bozuk hash hatası.
 - Eksik veya yanlış key share hatası.
 
+## Docker Usage
+
+Docker desteği CLI, test, node server ve Streamlit UI akışlarını container içinde çalıştırmak için eklenmiştir. Docker imajı `python:3.11-slim` tabanlıdır ve çalışma dizini `/app` olarak ayarlanır.
+
+### Kurulum ve Build
+
+```bash
+docker compose build
+```
+
+Makefile kullanıyorsanız:
+
+```bash
+make docker-build
+```
+
+### Docker İçinde Test Çalıştırma
+
+```bash
+docker compose run --rm app pytest
+```
+
+Ek Docker E2E akışı için:
+
+```bash
+docker compose run --rm app python scripts/docker_e2e.py --config config.docker.json
+```
+
+Makefile ile ikisini birlikte çalıştırmak için:
+
+```bash
+make docker-test
+```
+
+### Shared P2P Network Modu
+
+Varsayılan `docker-compose.yml` dosyası `app`, `node-a`, `node-b`, `node-c` ve `ui` servislerini aynı `p2p-shared` Docker network içine koyar. Bu modda node servisleri birbirini Docker service name üzerinden görebilir.
+
+Üç node'u başlat:
+
+```bash
+docker compose up -d node-a node-b node-c
+```
+
+Demo dosyası oluştur ve CLI akışını Docker içinde çalıştır:
+
+```bash
+docker compose run --rm app python -c "from pathlib import Path; Path('workspace/test.bin').write_bytes(b'docker-demo-' * 1000)"
+docker compose run --rm app python main.py encrypt --input workspace/test.bin --output workspace --config config.docker.json
+docker compose run --rm app python main.py distribute --workspace workspace --config config.docker.json
+docker compose run --rm app python main.py reconstruct --workspace workspace --output workspace/restored.bin --config config.docker.json
+```
+
+Node TCP iletişimini dağıtım sonrası test etmek için:
+
+```bash
+docker compose run --rm app python scripts/docker_network_probe.py --config config.docker.json --node A
+```
+
+Makefile ile node'ları başlatmak için:
+
+```bash
+make docker-up
+```
+
+Kapatmak için:
+
+```bash
+make docker-down
+```
+
+### Streamlit UI'ı Docker'da Açma
+
+```bash
+docker compose up ui
+```
+
+Tarayıcıdan aç:
+
+```text
+http://localhost:8501
+```
+
+Makefile ile:
+
+```bash
+make docker-ui
+```
+
+UI container içinde `APP_CONFIG=config.docker.json` kullanılır. Local kullanım komutu değişmedi:
+
+```bash
+streamlit run ui/app.py
+```
+
+### Isolated Network Test Modu
+
+`docker-compose.isolated.yml` dosyası `node-a`, `node-b`, `node-c` ve `app` servislerini ayrı Docker networklere koyar. Bu modda node servislerinin birbirini veya app container'ını görememesi beklenir.
+
+Bu bir uygulama hatası değildir; network izolasyonunda timeout/error mekanizmasının düzgün çalıştığını gösteren negatif testtir.
+
+```bash
+make docker-isolated-test
+```
+
+Manuel komutlar:
+
+```bash
+docker compose -f docker-compose.isolated.yml up -d node-a node-b node-c
+docker compose -f docker-compose.isolated.yml run --rm app python scripts/docker_network_probe.py --config config.docker.json --node A --expect-failure
+docker compose -f docker-compose.isolated.yml down
+```
+
+### Docker Runtime Dosyaları
+
+`workspace` ve `nodes` dizinleri Docker named volume olarak bağlanır. `.dockerignore` dosyası `.git`, venv, cache, `.env`, runtime workspace dosyaları, test çıktıları ve node runtime dosyalarının image içine alınmasını engeller.
+
 ## Bilinen Sınırlamalar
 
 - Bu proje localhost tabanlı bir MVP'dir.
