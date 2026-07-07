@@ -1,0 +1,9 @@
+{
+  "chunk_size": 67108864,
+  "timeout_seconds": 30,
+  "nodes": [
+    {"id": "A", "host": "127.0.0.1", "port": 8001, "folder": "nodes/Node_A"},
+    {"id": "B", "host": "127.0.0.1", "port": 8002, "folder": "nodes/Node_B"},
+    {"id": "C", "host": "127.0.0.1", "port": 8003, "folder": "nodes/Node_C"}
+  ]
+}
