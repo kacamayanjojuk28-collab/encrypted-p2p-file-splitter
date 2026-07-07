@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 NONCE_SIZE = 12
 TAG_SIZE = 16
+MAX_CHUNKS_PER_FILE = 2**64
 
 
 def encrypt_file_streaming(
@@ -18,6 +19,12 @@ def encrypt_file_streaming(
     key: bytes,
     chunk_size: int,
 ) -> list[dict[str, int | str]]:
+    """Encrypt a file without loading it fully into memory.
+
+    Nonces are 96-bit values built from a random 32-bit prefix and a monotonic
+    64-bit chunk counter. The counter is checked before every encryption, which
+    makes nonce reuse impossible within a single encrypted file.
+    """
     source = Path(input_path)
     target = Path(encrypted_path)
     if not source.exists():
@@ -38,6 +45,8 @@ def encrypt_file_streaming(
             plaintext = in_file.read(chunk_size)
             if not plaintext:
                 break
+            if chunk_index >= MAX_CHUNKS_PER_FILE:
+                raise ValueError("File has too many chunks to guarantee unique AES-GCM nonces")
             nonce = nonce_prefix + chunk_index.to_bytes(8, "big")
             ciphertext = aesgcm.encrypt(nonce, plaintext, None)
             out_file.write(nonce)
@@ -62,6 +71,7 @@ def decrypt_file_streaming(
     key: bytes,
     chunks: list[dict[str, int | str]],
 ) -> None:
+    """Decrypt a manifest-described AES-GCM stream to an output file."""
     source = Path(encrypted_path)
     target = Path(output_path)
     if not source.exists():

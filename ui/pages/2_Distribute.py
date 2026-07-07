@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import streamlit as st
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config_module import load_config
+from src.crypto_module import read_json
+from src.storage_module import MANIFEST_NAME, distribute_workspace
+
+
+st.set_page_config(page_title="Distribute", layout="wide")
+st.title("Distribute")
+
+config = load_config(PROJECT_ROOT / "config.json")
+workspace_text = st.text_input("Workspace", value=str(PROJECT_ROOT / "workspace"))
+
+if st.button("Distribute", type="primary"):
+    try:
+        workspace = Path(workspace_text).expanduser()
+        messages: list[str] = []
+        distribute_workspace(workspace=workspace, config=config, progress=messages.append)
+        manifest = read_json(workspace / MANIFEST_NAME)
+        st.session_state["last_operation"] = "Distribute completed"
+
+        st.success("Distribution completed successfully.")
+        for message in messages:
+            st.write(message)
+
+        rows = []
+        for node, part in zip(config.nodes, manifest["parts"], strict=True):
+            rows.append(
+                {
+                    "mapping": f"Part {part['index']} -> Node {node.id}",
+                    "part_file": str(node.folder / str(part["filename"])),
+                    "key_share": str(node.folder / str(part["key_share"])),
+                }
+            )
+        st.dataframe(rows, use_container_width=True)
+    except Exception as exc:
+        st.error(f"Distribution failed: {exc}")

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from src.crypto_module import read_json
 from src.config_module import AppConfig, NodeConfig
 from src.integrity_module import sha256_file
 from src.storage_module import distribute_workspace, encrypt_workspace, reconstruct_workspace
@@ -32,10 +33,19 @@ def test_encrypt_distribute_reconstruct_round_trip(tmp_path: Path) -> None:
     restored = tmp_path / "restored.bin"
     source.write_bytes(deterministic_bytes(4096))
 
-    encrypt_workspace(source, workspace, config)
+    manifest_path = encrypt_workspace(source, workspace, config)
     distribute_workspace(workspace, config)
     reconstruct_workspace(workspace, restored, config)
 
+    manifest = read_json(manifest_path)
+    assert manifest["original_filename"] == "test.bin"
+    assert manifest["original_size"] == source.stat().st_size
+    assert manifest["original_sha256"] == sha256_file(source)
+    assert manifest["encrypted_size"] > 0
+    assert manifest["created_at"]
+    assert manifest["chunk_size"] == config.chunk_size
+    assert manifest["threshold"] == 3
+    assert len(manifest["parts"]) == 3
     assert sha256_file(restored) == sha256_file(source)
 
 
