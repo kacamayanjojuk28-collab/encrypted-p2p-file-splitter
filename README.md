@@ -97,6 +97,7 @@ Varsayılan yapılandırma `config.json` içindedir:
 {
   "chunk_size": 67108864,
   "timeout_seconds": 30,
+  "threshold": 3,
   "nodes": [
     {"id": "A", "host": "127.0.0.1", "port": 8001, "folder": "nodes/Node_A"},
     {"id": "B", "host": "127.0.0.1", "port": 8002, "folder": "nodes/Node_B"},
@@ -105,7 +106,7 @@ Varsayılan yapılandırma `config.json` içindedir:
 }
 ```
 
-`chunk_size` varsayılan olarak 64 MB'dir. Test veya demo için daha küçük bir değer kullanılabilir.
+`chunk_size` varsayılan olarak 64 MB'dir. Test veya demo için daha küçük bir değer kullanılabilir. `threshold` bu MVP'de sabit olarak `3` beklenir.
 
 ## CLI Kullanım Örnekleri
 
@@ -131,6 +132,16 @@ Belirli bir node için basit TCP server başlat:
 
 ```bash
 python main.py node --id A
+```
+
+CLI işlemleri okunabilir progress çıktıları verir:
+
+```text
+[1/4] Encrypting file...
+[2/4] Splitting encrypted file...
+[3/4] Creating key shares...
+[4/4] Writing manifest...
+Done.
 ```
 
 Farklı bir config dosyası kullanmak için:
@@ -193,6 +204,8 @@ Bu yaklaşım tek bir node'un anahtarı tek başına taşımasını engeller. An
 
 Hash uyuşmazlığı varsa reconstruct işlemi reddedilir.
 
+Manifest ayrıca `original_filename`, `original_size`, `original_sha256`, `encrypted_size`, `created_at`, `chunk_size` ve `threshold` alanlarını içerir. Reconstruct işlemi parça okumaya başlamadan önce manifest yapısını doğrular.
+
 ### Streaming Dosya İşleme
 
 Dosyalar RAM'e komple alınmaz. Şifreleme, parçalama, hash hesaplama ve reconstruct işlemleri chunk-based / streaming mantığıyla yapılır. Varsayılan chunk boyutu `config.json` içindeki `chunk_size` alanıyla yönetilir.
@@ -222,6 +235,7 @@ Test kapsamı:
 - P2P discovery, peer identity, authentication, authorization veya TLS yoktur.
 - NAT traversal yoktur.
 - `node` komutu basit TCP servis gösterimidir; ana reconstruct akışı node klasörlerinden okur.
+- Node protokolü MVP seviyesinde `REQUEST_PART`, `SEND_PART`, `ERROR` ve `ACK` mesajlarını kullanır.
 - 3-of-3 eşik modeli kırılgandır: tek bir parça veya key share eksikse dosya geri oluşturulamaz.
 - Manifest bütünlüğü için ayrı dijital imza veya MAC katmanı yoktur.
 - Kalıcı secret management, audit log ve secure deletion mekanizmaları yoktur.

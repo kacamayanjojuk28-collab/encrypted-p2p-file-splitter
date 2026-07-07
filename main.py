@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 from pathlib import Path
 
 from src.config_module import get_node, load_config
@@ -12,24 +13,60 @@ from src.storage_module import distribute_workspace, encrypt_workspace, reconstr
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="encrypted-p2p-file-splitter",
-        description="Encrypt, split, distribute, and reconstruct files with 3-of-3 key shares.",
+        description=(
+            "Encrypt files with AES-256-GCM, split encrypted output into 3 parts, "
+            "distribute parts to local node folders, and reconstruct the original file."
+        ),
     )
     parser.add_argument("--config", default="config.json", help="Path to config.json")
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable informational logs for troubleshooting.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    encrypt_parser = subparsers.add_parser("encrypt", help="Encrypt and split a file")
-    encrypt_parser.add_argument("--input", required=True, help="Input file path")
-    encrypt_parser.add_argument("--output", required=True, help="Workspace output folder")
+    encrypt_parser = subparsers.add_parser(
+        "encrypt",
+        help="Encrypt an input file, split encrypted data, and create key shares.",
+    )
+    encrypt_parser.add_argument("--input", required=True, help="Path to the file to encrypt.")
+    encrypt_parser.add_argument(
+        "--output",
+        required=True,
+        help="Workspace folder where encrypted parts, key shares, and manifest are written.",
+    )
 
-    distribute_parser = subparsers.add_parser("distribute", help="Copy parts and shares to nodes")
-    distribute_parser.add_argument("--workspace", required=True, help="Workspace folder")
+    distribute_parser = subparsers.add_parser(
+        "distribute",
+        help="Validate workspace files and copy each part/share pair to its node folder.",
+    )
+    distribute_parser.add_argument(
+        "--workspace",
+        required=True,
+        help="Workspace folder created by the encrypt command.",
+    )
 
-    reconstruct_parser = subparsers.add_parser("reconstruct", help="Rebuild and decrypt a file")
-    reconstruct_parser.add_argument("--workspace", required=True, help="Workspace folder")
-    reconstruct_parser.add_argument("--output", required=True, help="Restored output file path")
+    reconstruct_parser = subparsers.add_parser(
+        "reconstruct",
+        help="Validate node data, reassemble encrypted bytes, and decrypt the restored file.",
+    )
+    reconstruct_parser.add_argument(
+        "--workspace",
+        required=True,
+        help="Workspace folder containing parts_manifest.json.",
+    )
+    reconstruct_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path where the restored plaintext file will be written.",
+    )
 
-    node_parser = subparsers.add_parser("node", help="Start a simple localhost node server")
-    node_parser.add_argument("--id", required=True, help="Node id from config.json, e.g. A")
+    node_parser = subparsers.add_parser(
+        "node",
+        help="Start a localhost TCP server for one configured node.",
+    )
+    node_parser.add_argument("--id", required=True, help="Node id from config.json, e.g. A.")
 
     return parser
 
@@ -37,20 +74,32 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING,
+        format="%(levelname)s: %(message)s",
+    )
     config = load_config(args.config)
 
     try:
         if args.command == "encrypt":
-            manifest = encrypt_workspace(Path(args.input), Path(args.output), config)
-            print(f"Encryption complete. Manifest: {manifest}")
+            workspace = Path(args.output)
+            manifest = encrypt_workspace(Path(args.input), workspace, config, progress=print)
+            print("Done.")
+            print(f"Workspace: {workspace.resolve()}")
+            print(f"Manifest: {manifest.resolve()}")
         elif args.command == "distribute":
-            distribute_workspace(Path(args.workspace), config)
-            print("Distribution complete.")
+            distribute_workspace(Path(args.workspace), config, progress=print)
+            print("Done.")
+            for node in config.nodes:
+                print(f"Node {node.id}: {node.folder.resolve()}")
         elif args.command == "reconstruct":
-            reconstruct_workspace(Path(args.workspace), Path(args.output), config)
-            print(f"Reconstruction complete. Output: {Path(args.output)}")
+            output = Path(args.output)
+            reconstruct_workspace(Path(args.workspace), output, config, progress=print)
+            print("Done.")
+            print(f"Output: {output.resolve()}")
         elif args.command == "node":
             node = get_node(config, args.id)
+            print(f"Starting Node {node.id} with timeout={config.timeout_seconds}s")
             asyncio.run(run_node_server(node, config.timeout_seconds))
         else:
             parser.error(f"Unknown command: {args.command}")

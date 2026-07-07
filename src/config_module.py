@@ -18,18 +18,21 @@ class AppConfig:
     chunk_size: int
     timeout_seconds: int
     nodes: list[NodeConfig]
+    threshold: int = 3
 
 
 def load_config(config_path: Path | str = "config.json") -> AppConfig:
+    """Load and validate application configuration from JSON."""
     path = Path(config_path)
     if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
+        raise FileNotFoundError(f"Config file not found: {path.resolve()}")
 
     with path.open("r", encoding="utf-8") as handle:
         raw = json.load(handle)
 
     chunk_size = int(raw.get("chunk_size", 0))
     timeout_seconds = int(raw.get("timeout_seconds", 0))
+    threshold = int(raw.get("threshold", 3))
     nodes_raw = raw.get("nodes", [])
 
     if chunk_size <= 0:
@@ -38,6 +41,8 @@ def load_config(config_path: Path | str = "config.json") -> AppConfig:
         raise ValueError("config.json must define a positive timeout_seconds")
     if len(nodes_raw) != 3:
         raise ValueError("config.json must define exactly 3 nodes for this MVP")
+    if threshold != 3:
+        raise ValueError("This MVP supports only threshold=3")
 
     base_dir = path.resolve().parent
     nodes: list[NodeConfig] = []
@@ -63,10 +68,12 @@ def load_config(config_path: Path | str = "config.json") -> AppConfig:
         chunk_size=chunk_size,
         timeout_seconds=timeout_seconds,
         nodes=nodes,
+        threshold=threshold,
     )
 
 
 def get_node(config: AppConfig, node_id: str) -> NodeConfig:
+    """Return the configured node with the requested id."""
     for node in config.nodes:
         if node.id == node_id:
             return node
